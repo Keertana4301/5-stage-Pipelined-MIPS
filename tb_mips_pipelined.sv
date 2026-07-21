@@ -8,7 +8,7 @@ module tb_mips_pipelined;
     int   errors = 0;
     int   checks = 0;
 
-    mips_pipelined_top dut(
+    mips dut(
         .clk(clk),
         .rst(rst)
     );
