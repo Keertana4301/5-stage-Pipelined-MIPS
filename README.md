@@ -1,6 +1,6 @@
 # Pipelined MIPS Processor (5-Stage, Verilog)
 
-A 5-stage pipelined MIPS datapath (IF > ID > EX > MEM > WB) built from the
+A 5-stage pipelined MIPS datapath (IF -> ID -> EX -> MEM -> WB) built from the
 original single-cycle design, with full data-hazard forwarding, load-use
 stalling, and control-hazard flushing for branches and jumps. Synthesizable
 in Quartus; verified with a self-checking SystemVerilog testbench under
@@ -49,11 +49,11 @@ IF  --[IF/ID]-->  ID  --[ID/EX]-->  EX  --[EX/MEM]-->  MEM  --[MEM/WB]-->  WB
 
 - `register.v`: expanded from 16 to the full 32 MIPS registers (address
   fields are 5 bits, so this also fixes a latent addressing bug in the
-  original), and added the internal WB→ID bypass described above.
+  original), and added the internal WB->ID bypass described above.
 - `branch_mux.v` / `jump_mux.v` are no longer used as-is: branch resolution
   moved to EX and jump resolution to ID, so PC selection is now a single
-  priority mux in `mips.v` (`branch_taken_EX` > `jump_ID` >
-  `stall` > `pc+4`) rather than two independent muxes evaluated in the same
+  priority mux in `mips.v` (`branch_taken_EX` -> `jump_ID` ->
+  `stall` -> `pc+4`) rather than two independent muxes evaluated in the same
   cycle.
 - All purely combinational modules (`alu`, `control_unit`, `sign_extend`,
   `shift_left_2`, `branch_adder`, `jump_calc`, `mux2`, `mux3`, `pc_adder`,
@@ -114,14 +114,14 @@ every hazard path in the pipeline:
 |---|-------------|---------|
 | 1 | `addi $1, $0, 5`  | |
 | 2 | `addi $2, $0, 10` | |
-| 3 | `add  $3, $1, $2` | back-to-back RAW > EX/MEM→EX forward |
-| 4 | `sw   $3, 0($0)`  | store-data RAW > EX/MEM→EX forward into MEM stage |
+| 3 | `add  $3, $1, $2` | back-to-back RAW -> EX/MEM->EX forward |
+| 4 | `sw   $3, 0($0)`  | store-data RAW -> EX/MEM->EX forward into MEM stage |
 | 5 | `lw   $4, 0($0)`  | |
-| 6 | `add  $5, $4, $1` | load-use hazard > 1-cycle stall |
-| 7 | `beq  $1, $1, 2`  | taken branch > 2-bubble flush |
+| 6 | `add  $5, $4, $1` | load-use hazard -> 1-cycle stall |
+| 7 | `beq  $1, $1, 2`  | taken branch -> 2-bubble flush |
 | 8–9 | `addi $6,999` / `addi $7,888` | must be squashed, never execute |
 | 10 | `addi $8, $0, 42` | branch target |
-| 11 | `j 14`            | jump > 1-bubble flush |
+| 11 | `j 14`            | jump -> 1-bubble flush |
 | 12 | `addi $9,777`     | must be squashed, never executes |
 | 14 | `addi $10, $0, 55`| jump target |
 | 15 | `beq $1, $2, 5`   | not taken, falls through normally |
