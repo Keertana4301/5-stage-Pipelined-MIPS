@@ -1,6 +1,6 @@
 # Pipelined MIPS Processor (5-Stage, Verilog)
 
-A 5-stage pipelined MIPS datapath (IF → ID → EX → MEM → WB) built from the
+A 5-stage pipelined MIPS datapath (IF > ID > EX > MEM > WB) built from the
 original single-cycle design, with full data-hazard forwarding, load-use
 stalling, and control-hazard flushing for branches and jumps. Synthesizable
 in Quartus; verified with a self-checking SystemVerilog testbench under
@@ -28,7 +28,7 @@ IF  --[IF/ID]-->  ID  --[ID/EX]-->  EX  --[EX/MEM]-->  MEM  --[MEM/WB]-->  WB
   by subtracting the two operands). Two bubbles (the instructions in IF and
   ID at the time the branch is in EX) are flushed.
 - If a branch and a younger jump would both fire in the same cycle, the
-  (older) branch takes priority — both younger instructions are squashed
+  (older) branch takes priority - both younger instructions are squashed
   either way.
 
 ### Where data hazards are resolved
@@ -38,7 +38,7 @@ IF  --[IF/ID]-->  ID  --[ID/EX]-->  EX  --[EX/MEM]-->  MEM  --[MEM/WB]-->  WB
   inputs (and into the store-data path, independent of the `ALUSrc` mux).
 - **Load-use hazard**: a `hazard_unit` detects when the instruction in EX is
   a load whose destination is needed by the instruction currently in ID, and
-  stalls the pipeline (holds PC/IF-ID, bubbles ID/EX) for one cycle — the
+  stalls the pipeline (holds PC/IF-ID, bubbles ID/EX) for one cycle - the
   value is then available via forwarding on the next cycle.
 - **WB-to-ID same-cycle hazard**: since WB and ID happen on the same clock
   edge, the register file itself does a "write-first" internal bypass
@@ -52,14 +52,14 @@ IF  --[IF/ID]-->  ID  --[ID/EX]-->  EX  --[EX/MEM]-->  MEM  --[MEM/WB]-->  WB
   original), and added the internal WB→ID bypass described above.
 - `branch_mux.v` / `jump_mux.v` are no longer used as-is: branch resolution
   moved to EX and jump resolution to ID, so PC selection is now a single
-  priority mux in `mips_pipelined_top.v` (`branch_taken_EX` > `jump_ID` >
+  priority mux in `mips.v` (`branch_taken_EX` > `jump_ID` >
   `stall` > `pc+4`) rather than two independent muxes evaluated in the same
   cycle.
 - All purely combinational modules (`alu`, `control_unit`, `sign_extend`,
   `shift_left_2`, `branch_adder`, `jump_calc`, `mux2`, `mux3`, `pc_adder`,
   `program_counter`, `data_memory`) are reused unmodified — their behavior
   doesn't change, only *when* in the pipeline they're invoked.
-- `mips_pipelined_top.v` exposes a few debug output ports
+- `mips.v` exposes a few debug output ports
   (`debug_wb_data`, `debug_wb_reg`, `debug_wb_regwrite`, `debug_pc`) so the
   synthesized design has real, observable outputs. Without at least one
   output pin, Quartus's Fitter treats the entire datapath as unreachable
@@ -85,7 +85,7 @@ IF  --[IF/ID]-->  ID  --[ID/EX]-->  EX  --[EX/MEM]-->  MEM  --[MEM/WB]-->  WB
 
 ```
 src/
-  mips_pipelined_top.v   Top-level pipeline datapath + control wiring
+  mips.v   Top-level pipeline datapath + control wiring
                           (also exposes debug_* output ports, see above)
   if_id_reg.v             IF/ID pipeline register (stall + flush)
   id_ex_reg.v             ID/EX pipeline register (bubble insertion)
@@ -114,14 +114,14 @@ every hazard path in the pipeline:
 |---|-------------|---------|
 | 1 | `addi $1, $0, 5`  | |
 | 2 | `addi $2, $0, 10` | |
-| 3 | `add  $3, $1, $2` | back-to-back RAW → EX/MEM→EX forward |
-| 4 | `sw   $3, 0($0)`  | store-data RAW → EX/MEM→EX forward into MEM stage |
+| 3 | `add  $3, $1, $2` | back-to-back RAW > EX/MEM→EX forward |
+| 4 | `sw   $3, 0($0)`  | store-data RAW > EX/MEM→EX forward into MEM stage |
 | 5 | `lw   $4, 0($0)`  | |
-| 6 | `add  $5, $4, $1` | load-use hazard → 1-cycle stall |
-| 7 | `beq  $1, $1, 2`  | taken branch → 2-bubble flush |
+| 6 | `add  $5, $4, $1` | load-use hazard > 1-cycle stall |
+| 7 | `beq  $1, $1, 2`  | taken branch > 2-bubble flush |
 | 8–9 | `addi $6,999` / `addi $7,888` | must be squashed, never execute |
 | 10 | `addi $8, $0, 42` | branch target |
-| 11 | `j 14`            | jump → 1-bubble flush |
+| 11 | `j 14`            | jump > 1-bubble flush |
 | 12 | `addi $9,777`     | must be squashed, never executes |
 | 14 | `addi $10, $0, 55`| jump target |
 | 15 | `beq $1, $2, 5`   | not taken, falls through normally |
@@ -162,7 +162,7 @@ resulting `.vcd`.
 1. Create a new Quartus project and add **only the files under `src/`**
    (do **not** add `tb/tb_mips_pipelined.sv` — it's SystemVerilog testbench
    code, not synthesizable RTL, and isn't needed for the build).
-2. Set `mips_pipelined_top` as the **Top-Level Entity**.
+2. Set `mips` as the **Top-Level Entity**.
 3. `clk` and `rst` can be mapped to a board push-button/clock pin. The
    `debug_*` outputs can be left unassigned (or wired to LEDs) — they exist
    to keep the Fitter from optimizing away the whole design; see
